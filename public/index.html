@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clean Clone Studio</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="control-panel" aria-label="Clone controls">
+        <div class="brand-row">
+          <div class="mark" aria-hidden="true">
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <p class="eyebrow">Clean Clone Studio</p>
+            <h1>Framer and Webflow to static Tailwind</h1>
+          </div>
+        </div>
+
+        <form id="cloneForm" class="source-form">
+          <label for="targetUrl">Source URL</label>
+          <div class="url-row">
+            <input id="targetUrl" name="targetUrl" type="text" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.framer.website" required>
+            <button id="analyzeButton" class="icon-button primary" type="submit" title="Analyze URL" aria-label="Analyze URL">
+              <i data-lucide="scan-search"></i>
+            </button>
+          </div>
+          <p id="sourceMessage" class="source-message">Paste the published site URL, not the editor URL.</p>
+
+          <div class="segmented" role="radiogroup" aria-label="Source platform">
+            <label>
+              <input type="radio" name="platform" value="auto" checked>
+              <span>Auto</span>
+            </label>
+            <label>
+              <input type="radio" name="platform" value="framer">
+              <span>Framer</span>
+            </label>
+            <label>
+              <input type="radio" name="platform" value="webflow">
+              <span>Webflow</span>
+            </label>
+          </div>
+        </form>
+
+        <section class="settings-block" aria-label="Conversion settings">
+          <div class="block-heading">
+            <h2>Capture</h2>
+            <span id="detectedPlatform">No source</span>
+          </div>
+
+          <div class="viewport-grid">
+            <button class="viewport-option active" data-width="1440" data-height="960" type="button">
+              <i data-lucide="monitor"></i>
+              <span>Desktop</span>
+            </button>
+            <button class="viewport-option" data-width="834" data-height="1112" type="button">
+              <i data-lucide="tablet"></i>
+              <span>Tablet</span>
+            </button>
+            <button class="viewport-option" data-width="390" data-height="844" type="button">
+              <i data-lucide="smartphone"></i>
+              <span>Mobile</span>
+            </button>
+          </div>
+
+          <div class="setting-row">
+            <label for="sampleDepth">Sampling depth</label>
+            <input id="sampleDepth" type="range" min="80" max="900" value="420" step="20">
+            <output id="sampleDepthValue" for="sampleDepth">420 nodes</output>
+          </div>
+
+          <label class="toggle-row">
+            <input id="includeBackgrounds" type="checkbox" checked>
+            <span>Include layout backgrounds</span>
+          </label>
+          <label class="toggle-row">
+            <input id="includeImages" type="checkbox" checked>
+            <span>Preserve image assets</span>
+          </label>
+        </section>
+
+        <section class="status-panel" aria-live="polite">
+          <div class="status-dot" id="statusDot"></div>
+          <div>
+            <p id="statusTitle">Ready</p>
+            <span id="statusDetail">Enter a Framer or Webflow URL you own or have permission to clone.</span>
+          </div>
+        </section>
+      </aside>
+
+      <section class="workbench">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <button id="captureButton" class="text-button" type="button" disabled>
+              <i data-lucide="wand-sparkles"></i>
+              <span>Generate clone</span>
+            </button>
+            <button id="refreshButton" class="icon-button" type="button" disabled title="Reload preview" aria-label="Reload preview">
+              <i data-lucide="refresh-cw"></i>
+            </button>
+          </div>
+          <div class="toolbar-actions">
+            <button id="copyButton" class="icon-button" type="button" disabled title="Copy current code" aria-label="Copy current code">
+              <i data-lucide="copy"></i>
+            </button>
+            <button id="downloadButton" class="icon-button" type="button" disabled title="Download clone HTML" aria-label="Download clone HTML">
+              <i data-lucide="download"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="workspace-grid">
+          <section class="preview-column" aria-label="Rendered source preview">
+            <div class="surface-header">
+              <div>
+                <p>Rendered source</p>
+                <span id="previewMeta">Waiting for a URL</span>
+              </div>
+              <span id="viewportLabel">1440 x 960</span>
+            </div>
+            <div class="preview-stage">
+              <iframe id="sourceFrame" title="Source page preview" sandbox="allow-same-origin"></iframe>
+              <div id="emptyPreview" class="empty-state">
+                <i data-lucide="panel-top-open"></i>
+                <p>Preview loads here after analysis.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="code-column" aria-label="Generated output">
+            <div class="surface-header">
+              <div>
+                <p>Clean output</p>
+                <span id="outputMeta">HTML, Tailwind classes, and minimal JavaScript</span>
+              </div>
+            </div>
+
+            <div class="tabs" role="tablist" aria-label="Generated files">
+              <button class="tab active" data-tab="html" role="tab" type="button">HTML</button>
+              <button class="tab" data-tab="tailwind" role="tab" type="button">Tailwind</button>
+              <button class="tab" data-tab="js" role="tab" type="button">JS</button>
+            </div>
+
+            <pre class="code-surface"><code id="codeOutput">Generated code will appear here.</code></pre>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
