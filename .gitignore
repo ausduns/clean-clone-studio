@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 .playwright-mcp/
+output/
+temp_analyze.json
+*.log
