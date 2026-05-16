@@ -3,12 +3,12 @@ const state = {
   finalUrl: "",
   detectedPlatform: "",
   viewport: { width: 1440, height: 960 },
-  activeTab: "html",
   output: {
     html: "Generated code will appear here.",
     tailwind: "Tailwind class notes will appear here.",
     js: "// Generated JavaScript will appear here."
-  }
+  },
+  showingGeneratedCode: false
 };
 
 const els = {
@@ -25,8 +25,9 @@ const els = {
   captureButton: document.querySelector("#captureButton"),
   refreshButton: document.querySelector("#refreshButton"),
   copyButton: document.querySelector("#copyButton"),
+  copyDropdown: document.querySelector("#copyDropdown"),
   downloadButton: document.querySelector("#downloadButton"),
-  codeOutput: document.querySelector("#codeOutput"),
+  downloadDropdown: document.querySelector("#downloadDropdown"),
   sampleDepth: document.querySelector("#sampleDepth"),
   sampleDepthValue: document.querySelector("#sampleDepthValue"),
   includeBackgrounds: document.querySelector("#includeBackgrounds"),
@@ -323,6 +324,16 @@ function renderSemanticTree(node, indent = 2) {
     html += renderSemanticTree(child, indent + 2);
   }
 
+
+  if (node.text) {
+    html += `${spaces}  ${escapeHtml(node.text)}
+`;
+  }
+
+  for (const child of node.children) {
+    html += renderSemanticTree(child, indent + 2);
+  }
+
   html += `${spaces}</${tag}>
 `;
   return html;
@@ -391,9 +402,13 @@ function setViewport(width, height) {
 }
 
 function loadPreview() {
-  if (!state.sourceHtml) return;
+  if (!state.sourceHtml && !state.showingGeneratedCode) return;
   els.emptyPreview.hidden = true;
-  els.sourceFrame.srcdoc = state.sourceHtml;
+  if (state.showingGeneratedCode) {
+    els.sourceFrame.srcdoc = state.output.html;
+  } else {
+    els.sourceFrame.srcdoc = state.sourceHtml;
+  }
 }
 
 async function analyzeUrl(url, requestedPlatform) {
@@ -427,6 +442,7 @@ async function analyzeUrl(url, requestedPlatform) {
     }
     loadPreview();
 
+    state.showingGeneratedCode = false;
     els.captureButton.disabled = false;
     els.refreshButton.disabled = false;
     setSourceMessage(
@@ -446,20 +462,41 @@ async function generateClone() {
   await new Promise((resolve) => setTimeout(resolve, 600));
   const sample = sampleFrame();
   state.output = buildCloneOutput(sample);
-  updateCodeView();
+  state.showingGeneratedCode = true;
+  loadPreview();
   els.copyButton.disabled = false;
   els.downloadButton.disabled = false;
   setStatus("ready", "Clone generated", `Semantic DOM tree successfully captured into clean static output.`);
 }
 
-function downloadHtml() {
-  const blob = new Blob([state.output.html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "clean-clone.html";
-  link.click();
-  URL.revokeObjectURL(url);
+
+async function downloadFormat(format) {
+  if (format === 'zip') {
+    if (!window.JSZip) {
+      setStatus("error", "Download failed", "JSZip library not loaded.");
+      return;
+    }
+    const zip = new window.JSZip();
+    zip.file("index.html", state.output.html);
+    zip.file("tailwind.txt", state.output.tailwind);
+    zip.file("clone.js", state.output.js);
+    const content = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(content);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "clean-clone.zip";
+    link.click();
+    URL.revokeObjectURL(url);
+  } else {
+    const ext = format === 'tailwind' ? 'txt' : format;
+    const blob = new Blob([state.output[format]], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `clean-clone.${ext}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 els.form.addEventListener("submit", async (event) => {
@@ -489,12 +526,58 @@ els.refreshButton.addEventListener("click", () => {
   setStatus("ready", "Preview reloaded", "The sandboxed source frame was refreshed.");
 });
 
-els.copyButton.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(state.output[state.activeTab]);
-  setStatus("ready", "Copied", `${state.activeTab.toUpperCase()} output copied to clipboard.`);
+// Dropdown logic
+let activeDropdown = null;
+
+function closeDropdowns() {
+  els.copyDropdown.classList.add("hidden");
+  els.downloadDropdown.classList.add("hidden");
+  activeDropdown = null;
+}
+
+els.copyButton.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (activeDropdown === els.copyDropdown) {
+    closeDropdowns();
+  } else {
+    closeDropdowns();
+    els.copyDropdown.classList.remove("hidden");
+    activeDropdown = els.copyDropdown;
+  }
 });
 
-els.downloadButton.addEventListener("click", downloadHtml);
+els.downloadButton.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (activeDropdown === els.downloadDropdown) {
+    closeDropdowns();
+  } else {
+    closeDropdowns();
+    els.downloadDropdown.classList.remove("hidden");
+    activeDropdown = els.downloadDropdown;
+  }
+});
+
+document.addEventListener("click", () => {
+  closeDropdowns();
+});
+
+document.querySelectorAll(".dropdown-item").forEach(item => {
+  item.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const action = e.target.dataset.action;
+    const format = e.target.dataset.format;
+
+    closeDropdowns();
+
+    if (action === "copy") {
+      await navigator.clipboard.writeText(state.output[format]);
+      setStatus("ready", "Copied", `${format.toUpperCase()} output copied to clipboard.`);
+    } else if (action === "download") {
+      await downloadFormat(format);
+      setStatus("ready", "Downloaded", `${format.toUpperCase()} output downloaded.`);
+    }
+  });
+});
 
 document.querySelectorAll(".viewport-option").forEach((button) => {
   button.addEventListener("click", () => {
@@ -505,21 +588,11 @@ document.querySelectorAll(".viewport-option").forEach((button) => {
   });
 });
 
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
-    tab.classList.add("active");
-    state.activeTab = tab.dataset.tab;
-    updateCodeView();
-  });
-});
-
 els.sampleDepth.addEventListener("input", () => {
   els.sampleDepthValue.textContent = `${els.sampleDepth.value} nodes`;
 });
 
 setViewport(1440, 960);
-updateCodeView();
 window.addEventListener("load", () => {
   if (window.lucide) window.lucide.createIcons();
 });

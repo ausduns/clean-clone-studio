@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/styles.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -108,12 +109,27 @@
             </button>
           </div>
           <div class="toolbar-actions">
-            <button id="copyButton" class="icon-button" type="button" disabled title="Copy current code" aria-label="Copy current code">
-              <i data-lucide="copy"></i>
-            </button>
-            <button id="downloadButton" class="icon-button" type="button" disabled title="Download clone HTML" aria-label="Download clone HTML">
-              <i data-lucide="download"></i>
-            </button>
+            <div class="dropdown-container relative">
+              <button id="copyButton" class="icon-button dropdown-trigger" type="button" disabled title="Copy code" aria-label="Copy code">
+                <i data-lucide="copy"></i>
+              </button>
+              <div id="copyDropdown" class="dropdown-menu hidden">
+                <button class="dropdown-item" data-action="copy" data-format="html">HTML</button>
+                <button class="dropdown-item" data-action="copy" data-format="tailwind">Tailwind</button>
+                <button class="dropdown-item" data-action="copy" data-format="js">JS</button>
+              </div>
+            </div>
+            <div class="dropdown-container relative">
+              <button id="downloadButton" class="icon-button dropdown-trigger" type="button" disabled title="Download code" aria-label="Download code">
+                <i data-lucide="download"></i>
+              </button>
+              <div id="downloadDropdown" class="dropdown-menu hidden">
+                <button class="dropdown-item" data-action="download" data-format="html">HTML</button>
+                <button class="dropdown-item" data-action="download" data-format="tailwind">Tailwind</button>
+                <button class="dropdown-item" data-action="download" data-format="js">JS</button>
+                <button class="dropdown-item" data-action="download" data-format="zip">Full ZIP</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -135,22 +151,6 @@
             </div>
           </section>
 
-          <section class="code-column" aria-label="Generated output">
-            <div class="surface-header">
-              <div>
-                <p>Clean output</p>
-                <span id="outputMeta">HTML, Tailwind classes, and minimal JavaScript</span>
-              </div>
-            </div>
-
-            <div class="tabs" role="tablist" aria-label="Generated files">
-              <button class="tab active" data-tab="html" role="tab" type="button">HTML</button>
-              <button class="tab" data-tab="tailwind" role="tab" type="button">Tailwind</button>
-              <button class="tab" data-tab="js" role="tab" type="button">JS</button>
-            </div>
-
-            <pre class="code-surface"><code id="codeOutput">Generated code will appear here.</code></pre>
-          </section>
         </div>
       </section>
     </main>
