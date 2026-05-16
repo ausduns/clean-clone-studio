@@ -208,110 +208,146 @@ function absolutizeUrl(value) {
   }
 }
 
+
+// ------------------------------------------------------------------
+// SEMANTIC EXTRACTION ENGINE (Replacing Absolute Positioning Engine)
+// ------------------------------------------------------------------
+
+function extractSemanticNode(el, doc) {
+  if (["SCRIPT", "STYLE", "LINK", "META", "NOSCRIPT", "SOURCE", "BR"].includes(el.tagName)) return null;
+
+  const computed = doc.defaultView.getComputedStyle(el);
+  const rect = el.getBoundingClientRect();
+
+  if (
+    computed.display === "none" ||
+    computed.visibility === "hidden" ||
+    Number(computed.opacity) < 0.01 ||
+    (rect.width === 0 && rect.height === 0 && el.tagName !== "IMG")
+  ) {
+    return null;
+  }
+
+  const nodeData = {
+    tagName: el.tagName.toLowerCase(),
+    text: Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim(),
+    style: {
+      display: computed.display,
+      flexDirection: computed.flexDirection,
+      justifyContent: computed.justifyContent,
+      alignItems: computed.alignItems,
+      padding: computed.padding,
+      margin: computed.margin,
+      gap: computed.gap,
+      backgroundColor: computed.backgroundColor,
+      color: computed.color,
+      fontSize: computed.fontSize,
+      fontWeight: computed.fontWeight,
+      lineHeight: computed.lineHeight,
+      borderRadius: computed.borderRadius,
+      borderWidth: computed.borderWidth,
+      borderColor: computed.borderColor,
+      width: rect.width,
+      height: rect.height,
+    },
+    children: []
+  };
+
+  if (el.tagName === "IMG") {
+    nodeData.src = absolutizeUrl(el.currentSrc || el.getAttribute("src"));
+    nodeData.alt = elementLabel(el);
+  }
+
+  for (const child of el.children) {
+    const childData = extractSemanticNode(child, doc);
+    if (childData) {
+      nodeData.children.push(childData);
+    }
+  }
+
+  return nodeData;
+}
+
+function toSemanticTailwindClasses(style) {
+  const classes = [];
+
+  if (style.display === "flex") {
+    classes.push("flex");
+    if (style.flexDirection === "column") classes.push("flex-col");
+    if (style.justifyContent && style.justifyContent !== "normal") classes.push(`justify-${style.justifyContent.replace('flex-', '')}`);
+    if (style.alignItems && style.alignItems !== "normal") classes.push(`items-${style.alignItems.replace('flex-', '')}`);
+    if (style.gap && style.gap !== "normal" && style.gap !== "0px") classes.push(`gap-[${style.gap}]`);
+  }
+
+  if (style.padding && style.padding !== "0px") classes.push(`p-[${style.padding}]`);
+  if (style.margin && style.margin !== "0px") classes.push(`m-[${style.margin}]`);
+
+  if (style.fontSize && style.fontSize !== "16px") classes.push(`text-[${style.fontSize}]`);
+  if (style.fontWeight && parseInt(style.fontWeight) > 400) classes.push(`font-[${style.fontWeight}]`);
+
+  const colorHex = rgbaToHex(style.color);
+  if (colorHex && colorHex !== "#000000") classes.push(`text-[${colorHex}]`);
+
+  const bgHex = rgbaToHex(style.backgroundColor);
+  if (bgHex) classes.push(`bg-[${bgHex}]`);
+  if (style.borderRadius && style.borderRadius !== "0px") classes.push(`rounded-[${style.borderRadius}]`);
+
+  return classes.join(" ");
+}
+
+function renderSemanticTree(node, indent = 2) {
+  if (!node) return "";
+
+  const spaces = " ".repeat(indent);
+  const classes = toSemanticTailwindClasses(node.style);
+  const classAttr = classes ? ` class="${classes}"` : "";
+
+  if (node.tagName === "img") {
+    return `${spaces}<img src="${attr(node.src || '')}" alt="${attr(node.alt || '')}"${classAttr}>
+`;
+  }
+
+  let tag = node.tagName === "body" ? "main" : node.tagName;
+  if (!["main", "div", "section", "p", "h1", "h2", "h3", "h4", "h5", "h6", "span", "a", "button", "nav", "footer", "header"].includes(tag)) {
+    tag = "div";
+  }
+
+  let html = `${spaces}<${tag}${classAttr}>
+`;
+
+  if (node.text) {
+    html += `${spaces}  ${escapeHtml(node.text)}
+`;
+  }
+
+  for (const child of node.children) {
+    html += renderSemanticTree(child, indent + 2);
+  }
+
+  html += `${spaces}</${tag}>
+`;
+  return html;
+}
+
 function sampleFrame() {
   const doc = els.sourceFrame.contentDocument;
   if (!doc?.body) {
     throw new Error("The preview frame is not ready yet.");
   }
 
-  const maxNodes = Number(els.sampleDepth.value);
-  const includeBackgrounds = els.includeBackgrounds.checked;
-  const includeImages = els.includeImages.checked;
-  const all = Array.from(doc.body.querySelectorAll("*"));
-  const consumed = new WeakSet();
-  const layers = [];
-
-  for (const element of all) {
-    if (layers.length >= maxNodes) break;
-    if (consumed.has(element)) continue;
-    if (["SCRIPT", "STYLE", "LINK", "META", "NOSCRIPT", "SOURCE", "BR"].includes(element.tagName)) continue;
-
-    const rect = element.getBoundingClientRect();
-    const computed = doc.defaultView.getComputedStyle(element);
-    if (!isElementVisible(element, computed, rect)) continue;
-
-    const box = {
-      left: rect.left + doc.defaultView.scrollX,
-      top: rect.top + doc.defaultView.scrollY,
-      width: rect.width,
-      height: rect.height
-    };
-
-    if (includeImages && element.tagName === "IMG") {
-      const src = absolutizeUrl(element.currentSrc || element.getAttribute("src"));
-      if (src) {
-        layers.push({
-          type: "image",
-          box,
-          computed,
-          src,
-          alt: elementLabel(element)
-        });
-      }
-      continue;
-    }
-
-    const blockText = normalizeCapturedText(element.innerText || element.textContent || "");
-    if (blockText && isTextBlock(element) && rect.height <= state.viewport.height * 1.5) {
-      layers.push({
-        type: "text",
-        box,
-        computed,
-        text: blockText
-      });
-      markDescendantsConsumed(element, consumed);
-      continue;
-    }
-
-    const directText = Array.from(element.childNodes)
-      .filter((node) => node.nodeType === Node.TEXT_NODE)
-      .map((node) => node.textContent)
-      .join(" ");
-    const text = normalizeCapturedText(directText);
-    if (text && rect.height <= state.viewport.height * 1.5) {
-      layers.push({
-        type: "text",
-        box,
-        computed,
-        text
-      });
-      continue;
-    }
-
-    if (includeBackgrounds && hasMeaningfulBackground(computed)) {
-      layers.push({
-        type: "shape",
-        box,
-        computed
-      });
-    }
-  }
+  const rootNode = extractSemanticNode(doc.body, doc);
 
   return {
     width: state.viewport.width,
     height: Math.max(state.viewport.height, px(doc.documentElement.scrollHeight || doc.body.scrollHeight)),
     title: doc.title || "Cloned page",
-    layers
+    rootNode
   };
-}
-
-function renderLayer(layer) {
-  const className = classListForBox(layer.box, layer.computed, layer.type);
-
-  if (layer.type === "image") {
-    return `    <img class="${className}" src="${attr(layer.src)}" alt="${attr(layer.alt)}">`;
-  }
-
-  if (layer.type === "text") {
-    return `    <div class="${className}">${escapeHtml(layer.text)}</div>`;
-  }
-
-  return `    <div class="${className}" aria-hidden="true"></div>`;
 }
 
 function buildCloneOutput(sample) {
   const safeTitle = escapeHtml(sample.title);
-  const bodyLayers = sample.layers.map(renderLayer).join("\n");
+  const bodyLayers = renderSemanticTree(sample.rootNode);
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -321,31 +357,28 @@ function buildCloneOutput(sample) {
     <script src="https://cdn.tailwindcss.com"><\/script>
   </head>
   <body class="m-0 bg-white">
-    <main class="relative mx-auto overflow-hidden bg-white w-[${sample.width}px] min-h-[${sample.height}px]" data-clone-source="${attr(state.finalUrl)}">
 ${bodyLayers}
-    </main>
     <script src="./clone.js"><\/script>
   </body>
 </html>`;
 
   const tailwind = `/* Tailwind output notes
 Generated from computed layout at ${sample.width}px viewport width.
-The clone uses Tailwind arbitrary values for absolute positioning, sizing,
-colors, radii, borders, typography, and shadows.
+The clone uses Tailwind arbitrary values based on semantic DOM structure.
 
 Recommended production step:
 1. Move repeated arbitrary classes into components.
 2. Replace remote image URLs with downloaded assets when license permits.
-3. Re-capture tablet and mobile viewports if the source has responsive layouts.
 */`;
 
-  const js = `const cloneRoot = document.querySelector("[data-clone-source]");
+  const js = `const cloneRoot = document.querySelector("main");
 if (cloneRoot) {
   cloneRoot.dataset.renderedAt = new Date().toISOString();
 }`;
 
   return { html, tailwind, js };
 }
+
 
 function setViewport(width, height) {
   state.viewport = { width, height };
@@ -419,8 +452,7 @@ async function generateClone() {
   loadPreview();
   els.copyButton.disabled = false;
   els.downloadButton.disabled = false;
-  setStatus("ready", "Clone generated", `Semantic DOM tree successfully captured into clean static output. Preview now shows the generated code.`);
-}
+
 
 async function downloadFormat(format) {
   if (format === 'zip') {
