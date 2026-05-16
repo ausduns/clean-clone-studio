@@ -3,11 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "clean-clone": "./src/cli/index.js"
+  },
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "dotenv": "^17.4.2",
+    "playwright": "^1.60.0"
   }
 }
