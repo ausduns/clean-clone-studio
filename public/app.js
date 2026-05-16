@@ -324,6 +324,16 @@ function renderSemanticTree(node, indent = 2) {
     html += renderSemanticTree(child, indent + 2);
   }
 
+
+  if (node.text) {
+    html += `${spaces}  ${escapeHtml(node.text)}
+`;
+  }
+
+  for (const child of node.children) {
+    html += renderSemanticTree(child, indent + 2);
+  }
+
   html += `${spaces}</${tag}>
 `;
   return html;
@@ -379,6 +389,10 @@ if (cloneRoot) {
   return { html, tailwind, js };
 }
 
+
+function updateCodeView() {
+  els.codeOutput.textContent = state.output[state.activeTab];
+}
 
 function setViewport(width, height) {
   state.viewport = { width, height };
@@ -452,6 +466,8 @@ async function generateClone() {
   loadPreview();
   els.copyButton.disabled = false;
   els.downloadButton.disabled = false;
+  setStatus("ready", "Clone generated", `Semantic DOM tree successfully captured into clean static output.`);
+}
 
 
 async function downloadFormat(format) {
